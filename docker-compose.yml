@@ -1,0 +1,44 @@
+services:
+  mongo:
+    image: mongo:7
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-data:/data/db
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  app:
+    build: .
+    # No host-port binding — nginx is the only public entry point.
+    # docker-compose --scale app=N creates N containers; nginx upstream
+    # resolves "app:3000" via Docker DNS to all of them automatically.
+    expose:
+      - "3000"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/notificationSystem
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=change_this_to_a_long_random_secret
+      - JWT_EXPIRES_IN=1h
+      - NODE_ENV=test
+    depends_on:
+      - mongo
+      - redis
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "4000:80"       # host:4000 → nginx:80 → app instances
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
